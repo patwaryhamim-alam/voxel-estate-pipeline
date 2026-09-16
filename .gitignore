@@ -1,0 +1,30 @@
+# Environment
+venv/
+.env
+.env.backup*
+.env.backup_*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pth
+
+# Data files
+data/*.csv
+data/*.xlsx
+data/clients/
+credentials/
+*.json
+
+# Logs
+logs/
+src/logs/
+*.log
+
+# Configs (contains client Sheet IDs)
+configs/
+
+# IDE
+.vscode/
+.idea/
