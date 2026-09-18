@@ -1,0 +1,11 @@
+{
+    "client_id": "client_001",
+    "name": "Test Client A",
+    "email": "test@example.com",
+    "county": "maricopa_az",
+    "sheet_id": "1z-yQL9tDBvdKacNJYu1zmM0gwITp3N6qjddIcEFBjlU",
+    "csv_path": "data/clients/client_001.csv",
+    "active": true,
+    "joined": "2026-09-15",
+    "notes": "Test client for pipeline validation"
+  }
