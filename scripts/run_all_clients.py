@@ -6,15 +6,6 @@ Runs the pipeline for EVERY active client in configs/clients/.
 USAGE:
     python scripts/run_all_clients.py
     python scripts/run_all_clients.py --dry-run
-
-WHAT IT DOES:
-    1. Loads all client configs from configs/clients/*.json
-    2. Filters to active clients only
-    3. Runs each client's pipeline sequentially
-    4. Prints a summary report (success/failure per client)
-    5. Failures do NOT stop other clients — isolated
-
-If one client fails, others continue.
 """
 
 import argparse
@@ -27,6 +18,8 @@ from pathlib import Path
 # Add src/ to path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+from alerts import send_error_alert
 
 from dotenv import load_dotenv
 
@@ -68,23 +61,20 @@ def load_all_configs():
 def run_one_client(config, dry_run=False):
     """
     Run pipeline for a single client.
-    Returns (success: bool, message: str, rows_pushed: int)
+    Returns (success: bool | None, message: str, rows_pushed: int)
     """
     client_id = config.get("client_id", "unknown")
     name = config.get("name", "Unknown")
 
     try:
-        # Verify required fields
         required = ["client_id", "name", "county", "sheet_id", "csv_path"]
         missing = [k for k in required if k not in config]
         if missing:
             return False, f"Missing fields: {missing}", 0
 
-        # Check active
         if not config.get("active", True):
             return None, "INACTIVE — skipped", 0
 
-        # Verify CSV exists
         csv_path = PROJECT_ROOT / config["csv_path"]
         if not csv_path.exists():
             return False, f"CSV not found: {config['csv_path']}", 0
@@ -92,22 +82,18 @@ def run_one_client(config, dry_run=False):
         if dry_run:
             return True, f"DRY-RUN OK (CSV: {csv_path.name})", 0
 
-        # Import and reload for fresh env per client
         from importlib import reload
         import os
         import data_collector
         import data_cleaner
         import sheet_pusher
 
-        # Set env vars for this client
         os.environ["GOOGLE_SHEET_ID"] = config["sheet_id"]
 
-        # Reload modules to pick up new env
         reload(data_collector)
         reload(data_cleaner)
         reload(sheet_pusher)
 
-        # Run pipeline with explicit CSV path
         raw = data_collector.load_property_data(str(csv_path))
         clean_df, _ = data_cleaner.clean_leads(raw)
         pushed = sheet_pusher.push_to_sheet(clean_df)
@@ -127,7 +113,6 @@ def main():
 
     print_header(f"🚀 RUNNING ALL CLIENTS  |  {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Load configs
     configs = load_all_configs()
     print(f"\nFound {len(configs)} client config(s)")
 
@@ -135,15 +120,12 @@ def main():
         print("⚠️  No client configs found in configs/clients/")
         sys.exit(1)
 
-    # Filter to active
     active_configs = [c for c in configs if c.get("active", True)]
     inactive_count = len(configs) - len(active_configs)
     print(f"Active: {len(active_configs)}  |  Inactive: {inactive_count}")
 
-    # Results tracking
     results = []
 
-    # Run each client
     for i, config in enumerate(active_configs, 1):
         client_id = config.get("client_id", "unknown")
         name = config.get("name", "Unknown")
@@ -195,7 +177,31 @@ def main():
 
     print("\n" + "=" * 70)
 
-    # Exit code: 0 if all succeeded, 1 if any failed
+    # Send batch-failure alert if any failed
+    if fail_count > 0 and not args.dry_run:
+        failed_clients = [r for r in results if r["success"] is False]
+        failed_summary = "\n".join([
+            f"  ❌ {r['client_id']} ({r['name']}): {r['message']}"
+            for r in failed_clients
+        ])
+
+        success_send, msg = send_error_alert(
+            subject=f"Batch Run: {fail_count} client(s) failed",
+            body=(
+                f"Total clients:   {len(results)}\n"
+                f"✅ Success:       {success_count}\n"
+                f"❌ Failed:        {fail_count}\n"
+                f"📤 Total rows:   {total_rows}\n"
+                f"⏱️  Duration:      {duration:.1f}s\n"
+                f"\nFailed clients:\n{failed_summary}"
+            ),
+            context="batch run",
+        )
+        if success_send:
+            print(f"\n📧 Alert sent: {msg}")
+        else:
+            print(f"\n⚠️  Alert failed: {msg}")
+
     sys.exit(0 if fail_count == 0 else 1)
 
 

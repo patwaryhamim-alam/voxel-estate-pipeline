@@ -19,6 +19,8 @@ from google.oauth2.service_account import Credentials
 
 from logger import get_logger
 
+from alerts import send_error_alert
+ 
 log = get_logger(__name__)
 
 load_dotenv()
@@ -190,6 +192,19 @@ def main():
     except Exception as e:
         print(f"\n❌ ERROR: {e}")
         log.error(f"Pipeline failed: {e}", exc_info=True)
+
+        # Send email alert
+        import sys
+        success, msg = send_error_alert(
+            subject="Pipeline Failed (sheet_pusher)",
+            body=f"Error: {str(e)[:500]}",
+            context="main pipeline",
+            exc_info=sys.exc_info(),
+        )
+        if success:
+            print(f"📧 Alert sent: {msg}")
+        else:
+            print(f"⚠️  Alert failed: {msg}")
 
 
 if __name__ == "__main__":

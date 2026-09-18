@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 import sys
+import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -19,6 +20,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from dotenv import load_dotenv
+from alerts import send_error_alert
 
 
 CONFIG_DIR = PROJECT_ROOT / "configs" / "clients"
@@ -30,15 +32,31 @@ def print_header(message):
     print("=" * 70)
 
 
-def fail(reason):
+def fail(reason, context="", exc_info=None):
+    """Print failure and optionally send email alert."""
     print(f"\n❌ FAILED: {reason}")
+
+    # Send alert if context provided
+    if context:
+        success, msg = send_error_alert(
+            subject=f"Pipeline Failed: {context}",
+            body=f"Error: {reason}",
+            context=context,
+            exc_info=exc_info,
+        )
+        if success:
+            print(f"📧 Alert sent: {msg}")
+
     sys.exit(1)
 
 
 def load_client_config(client_id):
     config_file = CONFIG_DIR / f"{client_id}.json"
     if not config_file.exists():
-        fail(f"Client config not found: {config_file}")
+        fail(
+            f"Client config not found: {config_file}",
+            context=f"client:{client_id}",
+        )
 
     with open(config_file, "r", encoding="utf-8") as f:
         config = json.load(f)
@@ -46,15 +64,21 @@ def load_client_config(client_id):
     required = ["client_id", "name", "county", "sheet_id", "csv_path"]
     missing = [k for k in required if k not in config]
     if missing:
-        fail(f"Client config missing required fields: {missing}")
+        fail(
+            f"Client config missing required fields: {missing}",
+            context=f"client:{client_id}",
+        )
 
     return config
 
 
-def verify_csv(csv_path):
+def verify_csv(csv_path, context=""):
     csv_full = PROJECT_ROOT / csv_path
     if not csv_full.exists():
-        fail(f"CSV file not found: {csv_full}")
+        fail(
+            f"CSV file not found: {csv_full}",
+            context=context,
+        )
     return csv_full
 
 
@@ -81,7 +105,7 @@ def main():
     print(f"   ✅ Client is active")
 
     print(f"\n[3/4] Verifying CSV file")
-    csv_full = verify_csv(config["csv_path"])
+    csv_full = verify_csv(config["csv_path"], context=f"client:{client_id}")
     print(f"   ✅ CSV found: {csv_full.name}")
 
     print(f"\n[4/4] Running pipeline")
@@ -128,6 +152,24 @@ def main():
         print(f"  ❌ PIPELINE FAILED FOR: {config['name']}")
         print(f"     Error: {str(e)[:200]}")
         print("=" * 70)
+
+        # Send email alert with full traceback
+        success, msg = send_error_alert(
+            subject=f"Pipeline Failed: {config['name']}",
+            body=(
+                f"Client: {config['name']} ({config['client_id']})\n"
+                f"County: {config['county']}\n"
+                f"CSV: {config['csv_path']}\n"
+                f"Error: {str(e)[:500]}"
+            ),
+            context=f"{config['client_id']}",
+            exc_info=sys.exc_info(),
+        )
+        if success:
+            print(f"   📧 Alert sent: {msg}")
+        else:
+            print(f"   ⚠️  Alert failed: {msg}")
+
         sys.exit(1)
 
 
