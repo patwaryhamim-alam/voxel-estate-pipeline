@@ -23,7 +23,7 @@ src/logs/
 *.log
 
 # Configs (contains client Sheet IDs)
-configs/
+#configs/
 
 # IDE
 .vscode/
