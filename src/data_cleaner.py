@@ -1,6 +1,12 @@
 """
 Module 2: AI Cleaning
 Takes Module 1's raw DataFrame and returns a clean, classified DataFrame.
+
+DESIGN:
+    - Python does deterministic work (filter, math, absentee detection)
+    - LLM provider does judgment (motivation classification)
+    - Results mapped back via lead_id (never send PII to AI)
+    - Optional RunSummary tracking for pipeline reporting
 """
 
 import os
@@ -14,17 +20,18 @@ import json
 import pandas as pd
 from datetime import datetime
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 from data_collector import load_property_data
 from absentee_detector import detect_absentee
 from us_validators import validate_phone, format_phone
+from llm_provider import classify_batch
 
 load_dotenv()
 
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 
+# ============================================================
 # OUTPUT CONTRACT — Module 3 expects these columns
+# ============================================================
 OUTPUT_COLUMNS = [
     "owner_name",
     "address",
@@ -47,16 +54,24 @@ def drop_invalid_rows(df):
     df = df[df["address"].astype(str).str.strip() != ""]
     after = len(df)
     print(f"[Python] Dropped {before - after} invalid rows ({before} → {after})")
-    return df
+    return df.reset_index(drop=True)
 
 
 # ============================================================
 # STEP 2: Compute price drop %
 # ============================================================
 def compute_price_drop_pct(df):
-    df["price_drop_pct"] = (
-        (df["previous_price"] - df["list_price"]) / df["previous_price"] * 100
-    ).round(1)
+    def _pct(row):
+        try:
+            prev = float(row["previous_price"])
+            curr = float(row["list_price"])
+            if prev <= 0:
+                return 0.0
+            return round((prev - curr) / prev * 100, 1)
+        except (ValueError, TypeError):
+            return 0.0
+
+    df["price_drop_pct"] = df.apply(_pct, axis=1)
     return df
 
 
@@ -64,12 +79,12 @@ def compute_price_drop_pct(df):
 # STEP 3: Absentee detection
 # ============================================================
 def detect_absentee_column(df):
-    """Add 'owner_status' column based on property vs mailing address."""
     statuses = []
     for _, row in df.iterrows():
         status, _ = detect_absentee(
             row.get("address"),
             row.get("owner_mailing_address"),
+            owner_name=row.get("owner_name"),  # For LLC/Trust detection
         )
         statuses.append(status)
     df["owner_status"] = statuses
@@ -77,10 +92,9 @@ def detect_absentee_column(df):
 
 
 # ============================================================
-# STEP 3B: Phone validation + cleaning
+# STEP 4: Phone validation + cleaning
 # ============================================================
 def clean_phone_column(df):
-    """Validate and format US phone numbers as (XXX) XXX-XXXX."""
     if "phone" not in df.columns:
         df["phone"] = None
         return df
@@ -97,95 +111,125 @@ def clean_phone_column(df):
 
 
 # ============================================================
-# STEP 4: AI classification
+# STEP 5: AI classification (via LLM provider abstraction)
 # ============================================================
-def build_ai_prompt(df):
-    leads_block = ""
+def classify_leads_with_provider(df, summary=None):
+    """
+    Send PII-free lead data to LLM provider.
+    Map results back via lead_id.
+    Optionally track stats in RunSummary.
+    """
+    # Build PII-free payload (includes distress_signals)
+    payload = []
     for idx, row in df.iterrows():
-        leads_block += f"""
-Lead #{idx + 1}:
-- Owner: {row['owner_name']}
-- Address: {row['address']}
-- County: {row['county']}
-- Listing Type: {row['listing_type']}
-- List Price: ${row['list_price']}
-- Previous Price: ${row['previous_price']}
-- Price Drop: {row['price_drop_pct']}%
-- Owner Status: {row['owner_status']}
-"""
+        payload.append({
+            "lead_id": int(idx),
+            "listing_type": str(row.get("listing_type", "unknown")),
+            "price_drop_pct": float(row.get("price_drop_pct", 0)),
+            "county": str(row.get("county", "unknown")),
+            "owner_status": str(row.get("owner_status", "unknown")),
+            "distress_signals": str(row.get("distress_signals", "") or ""),
+        })
 
-    prompt = f"""You are a US real estate lead analyst.
+    print(f"[AI] Sending {len(payload)} leads (batch mode, no PII)...")
 
-{leads_block}
+    # Track cache stats before/after
+    cache_before = _get_cache_stats_safe()
 
-For each lead, classify motivation and give a short reason.
+    # Call provider (handles batching, retry, fallback internally)
+    results = classify_batch(payload)
 
-CLASSIFICATION RULES:
-- "high_motivation"   = price drop > 10% OR (FSBO and price drop > 5%) OR out_of_state_absentee
-- "moderate_motivation" = FSBO with price drop 0-10%, OR price drop 5-10%, OR in_state_absentee
-- "low_motivation"    = no significant signals AND owner_occupied
+    cache_after = _get_cache_stats_safe()
 
-PRIORITY BONUS (add to reasoning):
-- out_of_state_absentee is the STRONGEST motivation signal — always mention it
-- in_state_absentee is a moderate signal
+    # Map back by lead_id
+    result_map = {r["lead_id"]: r for r in results}
 
-Return ONLY a JSON array, one object per lead, in order:
-[
-  {{"lead_number": 1, "signal_type": "high_motivation", "reason": "15% price drop + out-of-state owner"}},
-  {{"lead_number": 2, "signal_type": "moderate_motivation", "reason": "FSBO, owner-occupied"}}
-]
+    signal_types = []
+    ai_reasons = []
+    for idx in df.index:
+        r = result_map.get(int(idx), {})
+        signal_types.append(r.get("signal_type", "unclassified"))
+        ai_reasons.append(r.get("reason", ""))
 
-No extra text. Only JSON.
-"""
-    return prompt
+    df["signal_type"] = signal_types
+    df["ai_reason"] = ai_reasons
+
+    # Update summary
+    if summary is not None:
+        try:
+            newly_cached = max(0, cache_after - cache_before)
+            cached_hits = len(payload) - newly_cached
+            summary.set_ai_stats(
+                requests=0,  # approximate (batched internally)
+                cached=cached_hits,
+                classified=len(payload),
+                fallback=0,  # tracked inside llm_provider
+            )
+        except Exception:
+            pass
+
+    return df
 
 
-def classify_with_ai(df):
-    prompt = build_ai_prompt(df)
-    llm = ChatGoogleGenerativeAI(
-        model=MODEL_NAME,
-        google_api_key=os.getenv("GEMINI_API_KEY"),
-    )
-    response = llm.invoke(prompt)
-    raw = response.text.strip()
-
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
-
-    return json.loads(raw)
+def _get_cache_stats_safe():
+    """Safely get total cached count."""
+    try:
+        from cache_manager import cache_stats
+        return cache_stats().get("total_cached", 0)
+    except Exception:
+        return 0
 
 
 # ============================================================
-# MAIN
+# MAIN: clean_leads()
 # ============================================================
-def clean_leads(df):
+def clean_leads(df, summary=None):
+    """
+    Clean and classify leads.
+
+    Args:
+        df: Raw DataFrame from Module 1
+        summary: Optional RunSummary object for tracking
+
+    Returns:
+        (clean_output_df, detail_df)
+    """
     print("=" * 60)
     print("MODULE 2: AI CLEANING")
     print("=" * 60)
     print(f"Input rows: {len(df)}")
 
+    if summary is not None:
+        summary.set_input_rows(len(df))
+
+    # Python steps
+    before_filter = len(df)
     df = drop_invalid_rows(df)
+    dropped = before_filter - len(df)
+
+    if summary is not None:
+        summary.set_dropped_rows(dropped)
+
     df = compute_price_drop_pct(df)
     df = detect_absentee_column(df)
     df = clean_phone_column(df)
-    df = df.reset_index(drop=True)
 
-    print(f"[AI] Sending {len(df)} leads to {MODEL_NAME}...")
-    ai_results = classify_with_ai(df)
+    # AI step
+    df = classify_leads_with_provider(df, summary=summary)
 
-    df["signal_type"] = [r["signal_type"] for r in ai_results]
-    df["ai_reason"] = [r["reason"] for r in ai_results]
+    # Final columns
     df["price"] = df["list_price"]
     df["date_flagged"] = datetime.now().strftime("%Y-%m-%d")
 
+    # Output
     output = df[OUTPUT_COLUMNS].copy()
     detail = df[["owner_name", "owner_status", "phone", "signal_type", "ai_reason", "price_drop_pct"]]
     return output, detail
 
 
+# ============================================================
+# PRESENTATION
+# ============================================================
 def print_before_after(raw_df, clean_df, detail_df):
     print("\n" + "=" * 60)
     print("AI CLASSIFICATION DETAIL:")

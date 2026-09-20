@@ -23,6 +23,7 @@ EXPECTED_COLUMNS = [
     "list_price",
     "previous_price",
     "county",
+    "distress_signals",  # NEW
 ]
 
 DEFAULT_DATA_FILE = "data/property_leads.csv"
@@ -36,9 +37,11 @@ def _detect_format(df):
     """Detect the format of the DataFrame."""
     cols = set(df.columns)
 
-    if set(EXPECTED_COLUMNS).issubset(cols):
+    # Standard format: check required columns (distress_signals optional)
+    required_standard = [c for c in EXPECTED_COLUMNS if c != "distress_signals"]
+    if set(required_standard).issubset(cols):
         return "standard"
-
+        
     propstream_markers = {
         "Owner First Name", "Owner Last Name", "Property Address",
         "For Sale By Owner", "Listing Price",
@@ -70,9 +73,14 @@ def load_property_data(file_path=None):
     print(f"[Module 1] Detected format: {fmt}")
 
     if fmt == "standard":
-        missing = [c for c in EXPECTED_COLUMNS if c not in df.columns]
+        # Check required columns (distress_signals is optional)
+        required_cols = [c for c in EXPECTED_COLUMNS if c != "distress_signals"]
+        missing = [c for c in required_cols if c not in df.columns]
         if missing:
             raise ValueError(f"CSV is missing required columns: {missing}")
+        # Add distress_signals if missing
+        if "distress_signals" not in df.columns:
+            df["distress_signals"] = ""
         df = df[EXPECTED_COLUMNS]
 
     elif fmt == "propstream":
