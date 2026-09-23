@@ -1,0 +1,101 @@
+owner_name,address,owner_mailing_address,phone,listing_type,list_price,previous_price,county,distress_signals,days_on_market,property_type
+Moore Trust,3757 Pine Ave Houston TX,3757 Pine Ave Houston TX,(786) 403-9928,FSBO,460000,477000.0,Harris,,64,Multi-Family
+Elizabeth Smith,2715 Ridge Way Atlanta GA,2715 Ridge Way Atlanta GA,(602) 818-5333,price_drop,313000,345000.0,Fulton,,102,Single Family
+Andrew Davis,6301 Maple Pl Phoenix AZ,9559 Cedar Ave Atlanta GA,(512) 664-6977,FSBO,527000,576000.0,Maricopa,,64,Duplex
+Linda Moore,1269 Walnut Rd Dallas TX,1269 Walnut Rd Dallas TX,(602) 986-1916,price_drop,266000,290000.0,Dallas,probate,181,Multi-Family
+Daniel Sanchez,4486 Maple Ln Austin TX,4486 Maple Ln Austin TX,(469) 962-9830,FSBO,361000,403000.0,Travis,probate,122,Single Family
+Betty Sanchez,6030 Cedar Rd Plano TX,6030 Cedar Rd Plano TX,(615) 590-8668,FSBO,245000,260000.0,Collin,,179,Condo
+Kimberly Smith,1976 Sunset Pl Nashville TN,1976 Sunset Pl Nashville TN,(786) 980-3927,FSBO,278000,296000.0,Davidson,,189,Townhouse
+Susan Allen,3358 Pine Ct Nashville TN,3358 Pine Ct Nashville TN,,FSBO,534000,553000.0,Davidson,tax_delinquent,83,Single Family
+Jennifer Young,1233 Main Pl Memphis TN,1233 Main Pl Memphis TN,(469) 752-4295,price_drop,303000,350000.0,Shelby,,140,Duplex
+Karen Lewis,8579 Hill Ave Plano TX,5639 Oak Pl Phoenix AZ,,price_drop,529000,553000.0,Collin,probate,20,Single Family
+David Allen,3999 Elm Blvd Phoenix AZ,9455 Walnut Blvd Austin TX,(615) 678-1887,price_drop,428000,458000.0,Maricopa,,173,Condo
+Jessica Miller,4173 Cedar Ln Houston TX,4173 Cedar Ln Houston TX,(786) 300-1828,price_drop,371000,421000.0,Harris,,118,Duplex
+Jennifer Thomas,2824 Lake Blvd Nashville TN,1060 Pine Way Memphis TN,(919) 769-8973,FSBO,425000,518000.0,Davidson,pre_foreclosure,78,Condo
+Linda Brown,9589 Ridge Pl Dallas TX,1036 Oak Blvd Atlanta GA,,price_drop,210000,220000.0,Dallas,,22,Multi-Family
+Barbara Williams,1443 Lake Pl Austin TX,3446 Sunset Ct Dallas TX,(305) 209-8508,price_drop,389000,462000.0,Travis,,122,Single Family
+Robert Jones,8908 Cedar Pl Memphis TN,1227 Forest Ln Tampa FL,(901) 741-1128,FSBO,205000,253000.0,Shelby,"tax_delinquent,vacant",82,Multi-Family
+Robert Rodriguez,4433 Maple Ave Nashville TN,4433 Maple Ave Nashville TN,(512) 717-9004,price_drop,363000,390000.0,Davidson,tax_delinquent,57,Townhouse
+Emily Garcia,7039 Highland Dr Plano TX,2243 Sunset Dr Atlanta GA,(919) 352-9938,price_drop,452000,509000.0,Collin,,33,Single Family
+Kimberly Martinez,7141 Pine St Phoenix AZ,7141 Pine St Phoenix AZ,(615) 835-3532,FSBO,368000,399000.0,Maricopa,,95,Duplex
+Patricia Clark,506 Pine Ct Austin TX,506 Pine Ct Austin TX,(305) 591-1634,price_drop,671000,808000.0,Travis,,73,Single Family
+Margaret Thompson,5100 Highland Ln Charlotte NC,6628 Washington Dr Austin TX,(305) 467-3925,FSBO,366000,419000.0,Mecklenburg,probate,142,Single Family
+Thomas Williams,1876 Walnut Way Memphis TN,7249 Walnut Pl Nashville TN,,FSBO,231000,247000.0,Shelby,,186,Condo
+Richard White,7166 Maple Ct Nashville TN,7166 Maple Ct Nashville TN,(404) 396-7888,FSBO,377000,447000.0,Davidson,tax_delinquent,108,Townhouse
+Patricia Martin,6753 Park St Atlanta GA,6753 Park St Atlanta GA,(469) 723-8752,price_drop,425000,497000.0,Fulton,tax_delinquent,124,Condo
+Charles Allen,5591 Maple Ln Dallas TX,5591 Maple Ln Dallas TX,(713) 624-4185,price_drop,284000,295000.0,Dallas,pre_foreclosure,161,Duplex
+Barbara Martinez,190 Forest Ave Atlanta GA,190 Forest Ave Atlanta GA,(305) 667-3184,price_drop,292000,349000.0,Fulton,pre_foreclosure,17,Multi-Family
+Kimberly Lee,7351 Walnut Pl Charlotte NC,7351 Walnut Pl Charlotte NC,(512) 984-9540,price_drop,303000,344000.0,Mecklenburg,,197,Single Family
+Elizabeth Lewis,1369 Ridge Dr Charlotte NC,5338 Forest Pl Tampa FL,,FSBO,293000,327000.0,Mecklenburg,,185,Single Family
+Margaret Clark,1120 Cedar Way Atlanta GA,1120 Cedar Way Atlanta GA,(615) 751-9947,FSBO,502000,518000.0,Fulton,tax_delinquent,81,Duplex
+Sandra Anderson,4571 Lake Blvd Memphis TN,6724 Ridge Rd Tampa FL,(813) 777-1444,price_drop,371000,,Shelby,divorce,141,Single Family
+James Robinson,3077 Oak Dr Houston TX,7549 Washington Ct Dallas TX,,price_drop,296000,365000.0,Harris,,25,Condo
+Matthew Anderson,1224 Main St Nashville TN,1224 Main St Nashville TN,(813) 423-8619,price_drop,325000,381000.0,Davidson,,37,Condo
+William Davis,2783 Elm Ave Plano TX,2783 Elm Ave Plano TX,,FSBO,522000,662000.0,Collin,vacant,188,Single Family
+Susan Davis,9372 Main St Austin TX,6171 Maple Pl Dallas TX,(713) 924-3506,FSBO,257000,316000.0,Travis,,115,Single Family
+Ashley Moore,8917 Main Blvd Atlanta GA,8917 Main Blvd Atlanta GA,(713) 783-7209,FSBO,369000,454000.0,Fulton,,76,Condo
+Lee Holdings LLC,8088 Cedar Ct Tampa FL,8088 Cedar Ct Tampa FL,(469) 287-4954,FSBO,347000,415000.0,Hillsborough,,147,Single Family
+Barbara Walker,8141 Hill St Atlanta GA,6725 Ridge Ln Austin TX,(786) 538-6764,FSBO,548000,623000.0,Fulton,expired_listing,93,Condo
+Thomas Anderson,2076 Ridge Ln Charlotte NC,2076 Ridge Ln Charlotte NC,(512) 302-4180,price_drop,320000,364000.0,Mecklenburg,"tax_delinquent,vacant",155,Duplex
+Patricia Martin,331 Ridge Pl Plano TX,993 Park Dr Phoenix AZ,(713) 548-4020,price_drop,554000,632000.0,Collin,,151,Single Family
+Steven Davis,1170 Lake Blvd Phoenix AZ,2585 Pine Dr Houston TX,(469) 994-9561,FSBO,310000,,Maricopa,vacant,160,Multi-Family
+Donald Martin,9742 Lake Dr Atlanta GA,9742 Lake Dr Atlanta GA,(305) 360-4929,FSBO,520000,547000.0,Fulton,,165,Single Family
+William Smith,6793 Hill Blvd Dallas TX,4820 Ridge Dr Tampa FL,(469) 635-2880,price_drop,217000,273000.0,Dallas,probate,155,Townhouse
+Mary Moore,2430 Maple St Nashville TN,9849 Ridge Dr Plano TX,(713) 282-1653,price_drop,285000,312000.0,Davidson,vacant,74,Multi-Family
+Thomas Johnson,1596 Cedar St Atlanta GA,1596 Cedar St Atlanta GA,(512) 385-8141,FSBO,502000,482000.0,Fulton,pre_foreclosure,137,Townhouse
+Steven Thompson,6790 Washington Ct Charlotte NC,6790 Washington Ct Charlotte NC,(214) 665-2442,price_drop,393000,449000.0,Mecklenburg,probate,107,Duplex
+Lisa Sanchez,8531 Highland St Tampa FL,8531 Highland St Tampa FL,(901) 652-1845,price_drop,417000,,Hillsborough,expired_listing,97,Multi-Family
+James Jackson,7278 Forest Blvd Austin TX,4020 Ridge Rd Memphis TN,(901) 357-9165,FSBO,539000,503000.0,Travis,,34,Condo
+Elizabeth Clark,8005 Hill Ln Plano TX,6384 Cedar Pl Houston TX,(214) 489-5891,price_drop,257000,313000.0,Collin,vacant,92,Duplex
+Sandra Martinez,7416 Park Blvd Memphis TN,7560 Forest Ct Nashville TN,(919) 590-7325,price_drop,313000,349000.0,Shelby,vacant,16,Single Family
+Michael Rodriguez,8329 Walnut Ct Dallas TX,8329 Walnut Ct Dallas TX,(404) 276-8692,price_drop,232000,263000.0,Dallas,"tax_delinquent,vacant",41,Condo
+Nancy Garcia,5483 Highland Pl Plano TX,8094 Highland Pl Dallas TX,(919) 292-8110,FSBO,544000,,Collin,probate,180,Single Family
+Robert Lewis,2825 Ridge Dr Houston TX,2825 Ridge Dr Houston TX,(615) 779-3950,FSBO,320000,350000.0,Harris,tax_delinquent,115,Single Family
+Anthony Thomas,8253 Forest Rd Dallas TX,4261 Hill Dr Memphis TN,(813) 506-7951,FSBO,424000,504000.0,Dallas,,23,Condo
+Susan Gonzalez,6402 Highland Blvd Plano TX,9470 Washington Dr Charlotte NC,(919) 250-9138,FSBO,232000,275000.0,Collin,,7,Multi-Family
+Joseph Thompson,3688 Sunset Ln Plano TX,3688 Sunset Ln Plano TX,(713) 234-6977,price_drop,549000,,Collin,probate,170,Single Family
+Charles Lee,6907 Pine Ln Dallas TX,6094 Park Pl Nashville TN,(305) 679-2233,FSBO,266000,327000.0,Dallas,pre_foreclosure,80,Townhouse
+Joseph Sanchez,9231 Washington Ave Dallas TX,9231 Washington Ave Dallas TX,(615) 853-7086,FSBO,319000,361000.0,Dallas,probate,196,Townhouse
+Steven Johnson,9298 Washington Ln Houston TX,9298 Washington Ln Houston TX,(305) 299-4846,price_drop,308000,325000.0,Harris,,14,Single Family
+Margaret White,8950 Lake Rd Nashville TN,8950 Lake Rd Nashville TN,(713) 655-4868,FSBO,477000,603000.0,Davidson,,13,Townhouse
+Karen Thompson,1092 Lake Dr Tampa FL,7550 Maple Ln Houston TX,,FSBO,227000,246000.0,Hillsborough,,149,Single Family
+Linda Anderson,5483 Main Rd Nashville TN,5483 Main Rd Nashville TN,(305) 876-1422,FSBO,365000,387000.0,Davidson,,143,Single Family
+Thomas Investments LLC,358 Pine Dr Dallas TX,6997 Park Ave Memphis TN,(813) 244-9543,FSBO,430000,477000.0,Dallas,divorce,32,Condo
+Sarah Brown,7947 Highland Way Plano TX,8132 Ridge Blvd Houston TX,(786) 929-6327,FSBO,262000,278000.0,Collin,,75,Multi-Family
+Ashley Jackson,7533 Park Way Atlanta GA,9133 Ridge Ln Houston TX,(602) 637-6120,price_drop,437000,490000.0,Fulton,pre_foreclosure,107,Condo
+Mary Walker,1199 Maple Ave Plano TX,6205 Main Rd Phoenix AZ,(901) 968-7929,FSBO,527000,610000.0,Collin,probate,36,Condo
+Susan Thompson,1797 Walnut Pl Phoenix AZ,3774 Highland Ave Nashville TN,(786) 985-1430,FSBO,472000,572000.0,Maricopa,divorce,62,Duplex
+Elizabeth Johnson,3055 Elm Dr Memphis TN,3055 Elm Dr Memphis TN,(901) 231-2503,FSBO,132000,140000.0,Shelby,probate,107,Single Family
+Mark Robinson,5685 Pine Ct Nashville TN,9399 Walnut Ave Memphis TN,(615) 697-8242,FSBO,302000,354000.0,Davidson,probate,25,Single Family
+Paul Davis,5755 Lake Ave Atlanta GA,8733 Sunset Dr Nashville TN,(404) 982-5186,FSBO,316000,369000.0,Fulton,,57,Single Family
+John Young,7155 Pine Rd Plano TX,3870 Park Pl Austin TX,(602) 789-8033,FSBO,258000,311000.0,Collin,vacant,9,Condo
+Mark Jackson,1987 Lake St Memphis TN,1987 Lake St Memphis TN,(305) 449-8138,price_drop,340000,385000.0,Shelby,"tax_delinquent,vacant",97,Single Family
+Jennifer Sanchez,5183 Ridge Ct Memphis TN,1351 Park Ave Dallas TX,(512) 402-3842,price_drop,367000,406000.0,Shelby,probate,42,Single Family
+David Lopez,8195 Hill Blvd Memphis TN,8195 Hill Blvd Memphis TN,(512) 481-1920,FSBO,357000,392000.0,Shelby,pre_foreclosure,22,Condo
+Susan Robinson,7504 Oak St Tampa FL,7504 Oak St Tampa FL,(713) 794-1672,FSBO,240000,306000.0,Hillsborough,,162,Multi-Family
+Richard Lee,7892 Park Rd Charlotte NC,7892 Park Rd Charlotte NC,(214) 453-8172,price_drop,274000,338000.0,Mecklenburg,"tax_delinquent,vacant",26,Multi-Family
+William White,6208 Forest Dr Charlotte NC,6208 Forest Dr Charlotte NC,,FSBO,533000,,Mecklenburg,probate,170,Single Family
+Anthony Jackson,4228 Ridge Rd Houston TX,2417 Forest Ct Plano TX,(901) 536-3093,FSBO,355000,,Harris,"tax_delinquent,vacant",26,Single Family
+Betty Allen,6028 Oak Ct Nashville TN,5698 Main Blvd Memphis TN,(919) 739-1618,price_drop,339000,360000.0,Davidson,,30,Multi-Family
+James Harris,2627 Pine Rd Tampa FL,2627 Pine Rd Tampa FL,(919) 659-4833,price_drop,429000,399000.0,Hillsborough,"tax_delinquent,vacant",65,Condo
+Steven Gonzalez,6126 Sunset Blvd Nashville TN,6356 Park Pl Memphis TN,(602) 767-2680,price_drop,305000,373000.0,Davidson,,69,Single Family
+Charles Garcia,2726 Elm Blvd Nashville TN,2726 Elm Blvd Nashville TN,(615) 254-7495,price_drop,449000,,Davidson,,120,Single Family
+Anthony Garcia,6242 Cedar St Nashville TN,5593 Main Rd Memphis TN,(713) 830-1086,price_drop,240000,295000.0,Davidson,"tax_delinquent,vacant",40,Duplex
+Wilson Holdings LLC,9091 Ridge Pl Houston TX,3993 Elm Ave Austin TX,(713) 811-9782,FSBO,275000,336000.0,Harris,pre_foreclosure,21,Single Family
+Barbara Martinez,4872 Lake St Phoenix AZ,4872 Lake St Phoenix AZ,,price_drop,479000,568000.0,Maricopa,,139,Single Family
+Paul Johnson,6497 Highland Blvd Nashville TN,6216 Elm St Atlanta GA,(602) 336-1726,FSBO,255000,307000.0,Davidson,probate,31,Duplex
+Patricia Robinson,7940 Sunset Rd Tampa FL,7940 Sunset Rd Tampa FL,(786) 607-9897,FSBO,440000,403000.0,Hillsborough,,15,Single Family
+Richard Jackson,5948 Highland St Charlotte NC,5948 Highland St Charlotte NC,(615) 547-4060,FSBO,363000,,Mecklenburg,tax_delinquent,116,Condo
+Karen Moore,1453 Ridge Way Charlotte NC,9037 Elm Ct Dallas TX,(919) 654-6759,FSBO,262000,287000.0,Mecklenburg,pre_foreclosure,159,Townhouse
+Thompson Capital LLC,4598 Sunset St Charlotte NC,6052 Park Rd Atlanta GA,,FSBO,295000,351000.0,Mecklenburg,pre_foreclosure,13,Single Family
+Michael Martinez,7471 Washington Ct Tampa FL,7471 Washington Ct Tampa FL,(305) 226-4048,FSBO,501000,556000.0,Hillsborough,tax_delinquent,171,Single Family
+Kimberly Davis,4388 Main Dr Charlotte NC,4388 Main Dr Charlotte NC,(305) 662-3828,price_drop,541000,680000.0,Mecklenburg,pre_foreclosure,56,Single Family
+Daniel Thompson,1163 Park Pl Charlotte NC,2680 Ridge Rd Plano TX,(602) 767-7044,FSBO,487000,622000.0,Mecklenburg,,65,Duplex
+Kimberly Rodriguez,1512 Maple Dr Charlotte NC,1512 Maple Dr Charlotte NC,(901) 275-8372,price_drop,496000,556000.0,Mecklenburg,divorce,23,Single Family
+Matthew Rodriguez,9132 Sunset Rd Charlotte NC,9132 Sunset Rd Charlotte NC,(404) 530-4694,price_drop,447000,555000.0,Mecklenburg,,137,Single Family
+Ashley Jackson,1392 Elm Ln Tampa FL,1392 Elm Ln Tampa FL,(813) 357-3804,FSBO,266000,312000.0,Hillsborough,,133,Townhouse
+Jessica Williams,564 Maple St Memphis TN,564 Maple St Memphis TN,(901) 758-5745,FSBO,301000,349000.0,Shelby,divorce,168,Single Family
+Nancy Martin,7530 Maple St Plano TX,8033 Hill Ln Charlotte NC,(615) 333-7070,FSBO,538000,667000.0,Collin,tax_delinquent,192,Duplex
+Daniel Thomas,7742 Maple Dr Nashville TN,1686 Oak Dr Memphis TN,(469) 981-3610,price_drop,543000,690000.0,Davidson,,88,Multi-Family
+Margaret Young,5155 Hill St Charlotte NC,8381 Hill Ln Atlanta GA,(713) 492-9793,price_drop,526000,548000.0,Mecklenburg,pre_foreclosure,157,Duplex
+Betty Rodriguez,4433 Ridge Ct Phoenix AZ,4433 Ridge Ct Phoenix AZ,(615) 716-8378,FSBO,204000,237000.0,Maricopa,,97,Multi-Family

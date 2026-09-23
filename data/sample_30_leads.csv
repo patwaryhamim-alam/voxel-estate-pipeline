@@ -1,0 +1,31 @@
+owner_name,address,owner_mailing_address,phone,listing_type,list_price,previous_price,county
+Joseph Brown,4606 River Ln St. Louis MO,9035 Washington Cir Austin TX,,price_drop,128000,133000,St. Louis
+Anna Turner,3711 Lincoln Cir Tucson AZ,2715 Sycamore Way Houston TX,(404) 589-2584,FSBO,213000,213000,Pima
+George Cox,4433 Orchard St Charlotte NC,4433 Orchard St Charlotte NC,(602) 921-2139,price_drop,261000,302000,Mecklenburg
+Margaret Nguyen,1407 Forest Ave Houston TX,1407 Forest Ave Houston TX,(404) 823-3803,FSBO,235000,235000,Harris
+Sandra Lee,7673 Bay Dr Cincinnati OH,7673 Bay Dr Cincinnati OH,(615) 232-6168,FSBO,198000,198000,Hamilton
+Andrew Rodriguez,3556 Bristol Ct Raleigh NC,6582 Lakeshore Blvd Cincinnati OH,(901) 797-7543,price_drop,389000,412000,Wake
+Donald Moore,8448 Adams Ave Charlotte NC,8448 Adams Ave Charlotte NC,(919) 741-5119,price_drop,549000,584000,Mecklenburg
+,8897 Canyon Dr Cincinnati OH,8897 Canyon Dr Cincinnati OH,(619) 712-3927,FSBO,254000,254000,Hamilton
+,8417 Hampton Ln Cleveland OH,8937 Bluff Pl Mesa AZ,(702) 445-1949,FSBO,257000,257000,Cuyahoga
+Justin Hernandez,1503 Aspen Blvd Tampa FL,1503 Aspen Blvd Tampa FL,(619) 740-7932,FSBO,266000,266000,Hillsborough
+Anna Sanchez,5207 Harbor Ct Tucson AZ,5207 Harbor Ct Tucson AZ,(615) 802-4608,FSBO,205000,205000,Pima
+Mary Davis,3850 Elm St Phoenix AZ,4662 Hillside Blvd Mesa AZ,(972) 616-4119,price_drop,463000,490000,Maricopa
+Richard Parker,5904 Pacific Way Austin TX,5904 Pacific Way Austin TX,(615) 396-4116,FSBO,282000,282000,Travis
+Laura Moore,7012 Ridge Dr Cincinnati OH,7012 Ridge Dr Cincinnati OH,,FSBO,256000,256000,Hamilton
+Anna Johnson,1628 Canyon Ln St. Louis MO,7986 Highland Way Columbus OH,(919) 492-7930,FSBO,163000,163000,St. Louis
+Brenda Morales,2636 Main Dr Las Vegas NV,9589 Juniper Pl Houston TX,(512) 258-9320,FSBO,394000,394000,Clark
+Karen Rodriguez,9849 Elm Ln Dallas TX,9849 Elm Ln Dallas TX,,FSBO,309000,309000,Dallas
+Scott Reed,8665 Willow Dr Detroit MI,5247 River Dr Denver CO,(404) 209-8508,price_drop,114000,135000,Wayne
+Justin Gonzalez,1300 Cambridge Ln Kansas City MO,1227 River Ct St. Louis MO,(214) 883-5905,FSBO,181000,181000,Jackson
+Linda Moore,4433 Hill Ave Detroit MI,4433 Hill Ave Detroit MI,(619) 717-9004,FSBO,239000,239000,Wayne
+Robert Lopez,7039 Valley St Orlando FL,4391 Sunset Blvd Plano TX,(480) 758-1590,FSBO,414000,414000,Orange
+Scott Peterson,2526 Pacific Rd Charlotte NC,753 Chestnut Ln Nashville TN,(480) 442-3662,price_drop,274000,303000,Mecklenburg
+Edward Brown,3038 Juniper Ct Mesa AZ,3038 Juniper Ct Mesa AZ,,price_drop,310000,330000,Maricopa
+Donald Sanchez,7641 Chestnut Dr Columbus OH,7641 Chestnut Dr Columbus OH,,price_drop,162000,192000,Franklin
+Kimberly Hall,8446 Harbor Pl Colorado Springs CO,3025 Windsor Dr Denver CO,(901) 820-9379,FSBO,277000,277000,El Paso
+Deborah Kelly,3214 Meadow St Austin TX,3328 Magnolia Way Plano TX,(469) 937-5920,FSBO,747000,747000,Travis
+,5444 Harbor Dr Cleveland OH,2951 Sheffield Cir Cincinnati OH,(901) 793-6279,FSBO,206000,206000,Cuyahoga
+Ryan Cruz,3601 Jackson Blvd Memphis TN,3601 Jackson Blvd Memphis TN,(615) 888-6085,price_drop,303000,318000,Shelby
+Nancy Jackson,500 Pine Ln Tampa FL,500 Pine Ln Tampa FL,(813) 706-7547,FSBO,439000,439000,Hillsborough
+Charles Smith,1846 Bluff Way Tampa FL,7711 Cedar Pl Kansas City MO,(713) 973-8251,price_drop,264000,299000,Hillsborough

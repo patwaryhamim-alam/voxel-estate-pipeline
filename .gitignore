@@ -21,6 +21,11 @@ __pycache__/
 data/*.csv
 data/*.xlsx
 data/clients/
+
+# Sample data — no PII, needed by tests (smoke_test, batch_size)
+!data/sample_30_leads.csv
+!data/sample_100_leads.csv
+
 inbox/*
 !inbox/.gitkeep
 processed/*
@@ -29,6 +34,7 @@ output/*
 !output/.gitkeep
 pending/*
 !pending/.gitkeep
+
 # ============================================================
 # CACHE
 # ============================================================
