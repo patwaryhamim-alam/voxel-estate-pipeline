@@ -1,6 +1,6 @@
 """
-ADAPTER LAYER (v2 — Flexible Column Mapping)
-============================================
+ADAPTER LAYER (v3 — Flexible Column Mapping + Days/Type)
+=========================================================
 Converts external CSV formats into our standard format.
 
 KEY FEATURES:
@@ -9,6 +9,7 @@ KEY FEATURES:
     - Supports: PropStream, BatchLeads, Zillow, custom
     - Auto-format detection via column signatures
     - Clear error messages for unknown formats
+    - v3: adds days_on_market + property_type (Fix 5)
 
 DESIGN:
     Each source has its own adapter function.
@@ -31,7 +32,9 @@ EXPECTED_COLUMNS = [
     "list_price",
     "previous_price",
     "county",
-    "distress_signals",  # NEW
+    "days_on_market",    # NEW (Fix 5)
+    "property_type",     # NEW (Fix 5)
+    "distress_signals",
 ]
 
 DISTRESS_ALIASES = {
@@ -61,13 +64,11 @@ DISTRESS_ALIASES = {
 }
 
 
-
 # ============================================================
 # COLUMN ALIASES — map many possible names to one canonical name
 # ============================================================
 COLUMN_ALIASES = {
     # --- First Name ---
-    
     "first_name": [
         "owner first name", "first name", "firstname", "first",
         "owner 1 first name", "owner_first_name", "ownerfirstname",
@@ -79,7 +80,7 @@ COLUMN_ALIASES = {
         "owner 1 last name", "owner_last_name", "ownerlastname",
         "surname", "family name", "lname",
     ],
-    # --- Full Name (if not split) ---
+    # --- Full Name ---
     "full_name": [
         "owner name", "owner full name", "owner 1 full name",
         "ownername", "name", "contact name", "owner_name",
@@ -131,6 +132,20 @@ COLUMN_ALIASES = {
         "phone", "owner phone", "phone number", "phone_number",
         "telephone", "contact phone", "mobile",
     ],
+    # --- Days on Market (NEW — Fix 5) ---
+    "days_on_market": [
+        "days on market", "dom", "days_on_market",
+        "listing days", "days listed", "time on market",
+        "days on mkt", "market days", "dom count",
+        "days_on_mkt", "list days",
+    ],
+    # --- Property Type (NEW — Fix 5) ---
+    "property_type": [
+        "property type", "property_type", "type",
+        "home type", "building type", "land use",
+        "property category", "prop type", "propertytype",
+        "property class", "asset type",
+    ],
 }
 
 
@@ -142,10 +157,7 @@ def _normalize(s: str) -> str:
 
 
 def _build_lookup(df_columns: List[str]) -> Dict[str, str]:
-    """
-    Build a lookup: normalized_column → original_column.
-    Handles case-insensitivity and whitespace variations.
-    """
+    """Build a lookup: normalized_column → original_column."""
     lookup = {}
     for col in df_columns:
         normalized = _normalize(col)
@@ -154,12 +166,7 @@ def _build_lookup(df_columns: List[str]) -> Dict[str, str]:
 
 
 def _find_column(df_columns: List[str], alias_key: str) -> Optional[str]:
-    """
-    Find the original column name that matches any alias for `alias_key`.
-
-    Returns:
-        Original column name (str) or None if not found
-    """
+    """Find the original column name matching any alias for `alias_key`."""
     aliases = COLUMN_ALIASES.get(alias_key, [])
     lookup = _build_lookup(df_columns)
 
@@ -183,13 +190,10 @@ def _safe_str(val) -> str:
 
 def _combine_name(first, last, full):
     """Build owner_name from available fields."""
-    # Try first + last
     f = _safe_str(first)
     l = _safe_str(last)
     if f or l:
         return f"{f} {l}".strip()
-
-    # Fallback to full name field
     return _safe_str(full)
 
 
@@ -209,7 +213,7 @@ def _determine_listing_type(fsbo, price_drop):
         return "FSBO"
     if drop_yes:
         return "price_drop"
-    return "price_drop"  # default
+    return "price_drop"
 
 
 def _safe_number(val, default=None):
@@ -217,9 +221,19 @@ def _safe_number(val, default=None):
     if pd.isna(val) or val is None or val == "":
         return default
     try:
-        # Strip $ and commas
         s = str(val).replace("$", "").replace(",", "").strip()
         return float(s)
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_int(val, default=None):
+    """Convert to int safely (for days_on_market)."""
+    if pd.isna(val) or val is None or val == "":
+        return default
+    try:
+        s = str(val).replace(",", "").strip()
+        return int(float(s))
     except (ValueError, TypeError):
         return default
 
@@ -247,6 +261,8 @@ def adapt_generic(raw_df: pd.DataFrame) -> pd.DataFrame:
     fsbo_col = _find_column(cols, "fsbo")
     drop_col = _find_column(cols, "price_drop")
     phone_col = _find_column(cols, "phone")
+    dom_col = _find_column(cols, "days_on_market")   # NEW (Fix 5)
+    ptype_col = _find_column(cols, "property_type")  # NEW (Fix 5)
 
     # Validate: need at least address
     if not street_col:
@@ -256,7 +272,6 @@ def adapt_generic(raw_df: pd.DataFrame) -> pd.DataFrame:
             f"Available columns: {cols}"
         )
 
-    # Build output
     adapted = pd.DataFrame()
 
     # Owner name
@@ -282,8 +297,7 @@ def adapt_generic(raw_df: pd.DataFrame) -> pd.DataFrame:
         axis=1,
     )
 
-    # Mailing address (optional — same fields, may not exist)
-    mail_col = _find_column(cols, "street")  # for now, same as property
+    # Mailing address (optional)
     adapted["owner_mailing_address"] = None
 
     # Phone
@@ -312,38 +326,58 @@ def adapt_generic(raw_df: pd.DataFrame) -> pd.DataFrame:
     # County
     adapted["county"] = raw_df[county_col] if county_col else None
 
-      # ============================================================
-    # Distress signals (NEW — extract optional columns)
     # ============================================================
-    distress_signals = []
-    for signal_name, aliases in DISTRESS_ALIASES.items():
-        # Find matching column
-        col = None
-        for alias in aliases:
-            normalized_alias = _normalize(alias)
-            for original_col in cols:
-                if _normalize(original_col) == normalized_alias:
-                    col = original_col
+        # ============================================================
+       # ============================================================
+    # Days on market + Property type (Fix 5 + Fix 6b)
+    # ============================================================
+    # Fix 6b: use list of None instead of scalar None so the column
+    # is always created with correct length
+    if dom_col:
+        adapted["days_on_market"] = raw_df[dom_col].apply(_safe_int)
+    else:
+        adapted["days_on_market"] = [None] * len(raw_df)
+
+    if ptype_col:
+        adapted["property_type"] = raw_df[ptype_col].apply(_safe_str)
+    else:
+        adapted["property_type"] = [None] * len(raw_df)
+
+    # ============================================================
+    # Distress signals (row-wise — Fix 5 fixes scalar bug)
+    # ============================================================
+    # Build a per-row list of distress signals
+    row_signals = []
+    for _, row in raw_df.iterrows():
+        signals_for_row = []
+        for signal_name, aliases in DISTRESS_ALIASES.items():
+            # Find matching column
+            col = None
+            for alias in aliases:
+                normalized_alias = _normalize(alias)
+                for original_col in cols:
+                    if _normalize(original_col) == normalized_alias:
+                        col = original_col
+                        break
+                if col:
                     break
+
             if col:
-                break
+                val = str(row.get(col, "")).strip().lower()
+                if val in ("yes", "y", "true", "1"):
+                    signals_for_row.append(signal_name)
 
-        if col:
-            # Check if any row has a truthy value
-            values = raw_df[col].astype(str).str.strip().str.lower()
-            has_signal = values.isin(["yes", "y", "true", "1"]).any()
-            if has_signal:
-                distress_signals.append(signal_name)
+        row_signals.append(",".join(signals_for_row))
 
-    # Add as comma-separated string column
-    adapted["distress_signals"] = ",".join(distress_signals) if distress_signals else ""
+    adapted["distress_signals"] = row_signals
 
-    # Force column order (add distress at the end)
-    adapted = adapted[EXPECTED_COLUMNS + ["distress_signals"]]
+    # Force column order (Bug 3 fix: don't duplicate distress_signals)
+    adapted = adapted[EXPECTED_COLUMNS]
     return adapted
 
+
 # ============================================================
-# BACKWARD-COMPAT: adapt_propstream() still works
+# BACKWARD-COMPAT
 # ============================================================
 def adapt_propstream(raw_df: pd.DataFrame) -> pd.DataFrame:
     """PropStream adapter — now uses universal adapter internally."""
@@ -356,20 +390,19 @@ def load_from_propstream(file_path: str) -> pd.DataFrame:
 
 
 # ============================================================
-# FORMAT DETECTION (used by data_collector)
+# FORMAT DETECTION
 # ============================================================
 def detect_source_format(df: pd.DataFrame) -> str:
-    """
-    Detect source format by column signatures.
-
-    Returns:
-        "standard" | "propstream" | "batchleads" | "zillow" | "unknown"
-    """
+    """Detect source format by column signatures."""
     cols_normalized = {_normalize(c) for c in df.columns}
 
-    # Standard format — has our EXPECTED_COLUMNS
-    expected_normalized = {_normalize(c) for c in EXPECTED_COLUMNS}
-    if expected_normalized.issubset(cols_normalized):
+    # Standard format — has all required EXPECTED_COLUMNS
+    required = {
+        "owner_name", "address", "owner_mailing_address", "phone",
+        "listing_type", "list_price", "previous_price", "county",
+    }
+    required_normalized = {_normalize(c) for c in required}
+    if required_normalized.issubset(cols_normalized):
         return "standard"
 
     # PropStream markers
@@ -402,11 +435,11 @@ def detect_source_format(df: pd.DataFrame) -> str:
 # ============================================================
 if __name__ == "__main__":
     print("=" * 60)
-    print("ADAPTER v2 — FLEXIBILITY TEST")
+    print("ADAPTER v3 — Days/Type Test (Fix 5)")
     print("=" * 60)
 
-    # Test 1: PropStream-style
-    print("\n[1] PropStream format:")
+    # Test 1: PropStream-style + days + type
+    print("\n[1] PropStream format + days_on_market + property_type:")
     df1 = pd.DataFrame({
         "Owner First Name": ["John"],
         "Owner Last Name": ["Smith"],
@@ -418,12 +451,15 @@ if __name__ == "__main__":
         "Original Price": ["195000"],
         "For Sale By Owner": ["Yes"],
         "Price Drop Flag": ["Yes"],
+        "Days on Market": ["45"],
+        "Property Type": ["Single Family"],
+        "Tax Delinquent": ["Yes"],
     })
-    print(f"   Detected: {detect_source_format(df1)}")
-    print(adapt_generic(df1).to_string(index=False))
+    out1 = adapt_generic(df1)
+    print(out1.to_string(index=False))
 
-    # Test 2: Case variations
-    print("\n[2] Lowercase column names:")
+    # Test 2: Missing days/type → should be None/blank
+    print("\n[2] No days/type columns (should be None/blank):")
     df2 = pd.DataFrame({
         "owner_first_name": ["Sarah"],
         "owner_last_name": ["Johnson"],
@@ -433,24 +469,8 @@ if __name__ == "__main__":
         "county": ["Harris"],
         "listing_price": ["450000"],
         "original_price": ["485000"],
-        "for_sale_by_owner": ["No"],
-        "price_drop": ["Yes"],
     })
-    print(f"   Detected: {detect_source_format(df2)}")
-    print(adapt_generic(df2).to_string(index=False))
+    out2 = adapt_generic(df2)
+    print(out2.to_string(index=False))
 
-    # Test 3: Full name + batchleads style
-    print("\n[3] BatchLeads-style (full name):")
-    df3 = pd.DataFrame({
-        "Owner Name": ["David Wilson"],
-        "Property Street": ["654 Cedar Ln"],
-        "Property City": ["Plano"],
-        "State": ["TX"],
-        "County Name": ["Collin"],
-        "Asking Price": ["120000"],
-        "Original Price": ["135000"],
-    })
-    print(f"   Detected: {detect_source_format(df3)}")
-    print(adapt_generic(df3).to_string(index=False))
-
-    print("\n✅ All formats handled successfully!")
+    print("\n✅ Adapter v3 test complete")

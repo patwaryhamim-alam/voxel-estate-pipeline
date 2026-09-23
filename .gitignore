@@ -27,7 +27,8 @@ processed/*
 !processed/.gitkeep
 output/*
 !output/.gitkeep
-
+pending/*
+!pending/.gitkeep
 # ============================================================
 # CACHE
 # ============================================================
