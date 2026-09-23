@@ -5,22 +5,23 @@ Single function `classify_batch()` that all modules use.
 Swap providers (Gemini → DeepSeek) by editing ONE file.
 
 FEATURES:
-    - Batches 15 leads per request (vs 1 currently)
+    - Batches 15 leads per request
     - Classification cache (SQLite) — re-runs = 0 API calls
     - Exponential backoff on 429 rate limits
     - Retry 3 times, then fallback to rule-based
     - Robust JSON parsing (markdown fence stripping)
-    - Configurable model via LLM_MODEL env var
+    - Configurable model via LLM_MODEL (or GEMINI_MODEL) env var
     - PII-free prompts (no owner name, phone, address)
+    - v3: LLC/Trust owners do NOT boost motivation score
+    - v4: Per-minute vs Daily 429 handled separately
+    - v5: Prompt enriched with days_on_market + property_type
+    - v6: Daily 429 returns "pending" marker (Fix 1)
+    - v6: LLM call counter (for spot_check_ai.py)
+    - v6: Startup model-name log + fail-fast on 404 (Fix 3)
+    - v7 (Fix 3): ADMIN EMAIL ALERT on model-not-found
 
 USAGE:
-    from llm_provider import classify_batch
-    
-    results = classify_batch([
-        {"lead_id": 0, "listing_type": "FSBO", "price_drop_pct": 15.0, ...},
-        {"lead_id": 1, ...},
-    ])
-    # Returns: [{"lead_id": 0, "signal_type": "high_motivation", "reason": "..."}, ...]
+    from llm_provider import classify_batch, get_llm_call_count
 """
 
 import os
@@ -33,27 +34,105 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Cache integration
 from cache_manager import get_many, save_many
+
+# Fix 3: admin alert integration (import defensively)
+try:
+    from alerts import send_error_alert
+    _ALERTS_AVAILABLE = True
+except ImportError:
+    _ALERTS_AVAILABLE = False
+    send_error_alert = None
 
 # ============================================================
 # CONFIG — change via .env
 # ============================================================
-MODEL_NAME = os.getenv("LLM_MODEL", "gemini-3.5-flash")
+# Fix 3: prefer LLM_MODEL, fall back to GEMINI_MODEL, then default
+MODEL_NAME = (
+    os.getenv("LLM_MODEL")
+    or os.getenv("GEMINI_MODEL")
+    or "gemini-3.6-flash"
+)
 BATCH_SIZE = int(os.getenv("LLM_BATCH_SIZE", "15"))
 MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
-BASE_DELAY_SEC = 5  # exponential: 5, 10, 20
+BASE_DELAY_SEC = 5
 
-# Valid labels (strict)
 VALID_LABELS = {"high_motivation", "moderate_motivation", "low_motivation"}
 
-# Try to import logger
 try:
     from logger import get_logger
     log = get_logger(__name__)
 except ImportError:
     import logging
     log = logging.getLogger(__name__)
+
+
+# ============================================================
+# LLM CALL COUNTER
+# ============================================================
+_LLM_CALL_COUNT = 0
+_MODEL_LOGGED = False
+
+
+def get_llm_call_count() -> int:
+    """Return number of real LLM API calls made this session."""
+    return _LLM_CALL_COUNT
+
+
+def reset_llm_call_count() -> None:
+    """Reset the counter to zero."""
+    global _LLM_CALL_COUNT
+    _LLM_CALL_COUNT = 0
+
+
+def _log_model_once():
+    """Fix 3: log resolved model name + env source once per session."""
+    global _MODEL_LOGGED
+    if _MODEL_LOGGED:
+        return
+
+    if os.getenv("LLM_MODEL"):
+        src = "LLM_MODEL"
+    elif os.getenv("GEMINI_MODEL"):
+        src = "GEMINI_MODEL"
+    else:
+        src = "DEFAULT"
+
+    print(f"[LLM] Model: {MODEL_NAME} (source: {src})")
+    log.info(f"LLM model resolved: {MODEL_NAME} (from {src})")
+    _MODEL_LOGGED = True
+
+
+def _alert_model_not_found(model_name: str, err_str: str) -> None:
+    """
+    Fix 3: Send admin email when model name is invalid.
+
+    Non-fatal — pipeline still raises RuntimeError after this.
+    If alerts module unavailable, logs warning and continues.
+    """
+    if not _ALERTS_AVAILABLE:
+        log.warning("alerts module unavailable — cannot send model alert")
+        return
+
+    try:
+        success, msg = send_error_alert(
+            subject=f"LLM Model Not Found: {model_name}",
+            body=(
+                f"Model '{model_name}' is invalid or unavailable.\n\n"
+                f"Action required:\n"
+                f"1. Update GEMINI_MODEL in .env\n"
+                f"2. Check current model names at:\n"
+                f"   https://ai.google.dev/gemini-api/docs/models\n\n"
+                f"Error excerpt:\n{err_str[:400]}"
+            ),
+            context=f"llm_provider startup (model={model_name})",
+        )
+        if success:
+            log.info(f"Model-not-found alert email sent: {msg}")
+        else:
+            log.warning(f"Model alert email failed: {msg}")
+    except Exception as e:
+        log.warning(f"Failed to send model-not-found alert: {e}")
 
 
 # ============================================================
@@ -67,6 +146,12 @@ def _build_batch_prompt(leads: List[Dict[str, Any]]) -> str:
     leads_block = ""
     for lead in leads:
         distress = lead.get('distress_signals', '') or 'none'
+
+        dom = lead.get('days_on_market')
+        dom_str = f"{dom} days" if dom is not None else "unknown"
+
+        ptype = lead.get('property_type') or "unknown"
+
         leads_block += f"""
 Lead #{lead['lead_id']}:
 - Listing Type: {lead.get('listing_type', 'unknown')}
@@ -74,6 +159,8 @@ Lead #{lead['lead_id']}:
 - County: {lead.get('county', 'unknown')}
 - Owner Status: {lead.get('owner_status', 'unknown')}
 - Distress Signals: {distress}
+- Days on Market: {dom_str}
+- Property Type: {ptype}
 """
 
     prompt = f"""You are a US real estate lead analyst.
@@ -86,14 +173,28 @@ CLASSIFICATION RULES:
 - "high_motivation"   = price drop > 10% OR (FSBO and price drop > 5%) 
                         OR out_of_state_absentee OR any distress signal 
                         (tax_delinquent, pre_foreclosure, vacant)
+                        OR days_on_market > 180
 - "moderate_motivation" = FSBO with price drop 0-10%, OR price drop 5-10%, 
                           OR in_state_absentee, OR distress signals like 
                           expired_listing, divorce, probate
+                          OR days_on_market 90-180
 - "low_motivation"    = no significant signals AND owner_occupied
+                        AND days_on_market < 30
+
+ADDITIONAL SIGNALS (use if present):
+- Days on Market > 180: strong urgency (seller frustrated)
+- Days on Market 90-180: moderate urgency (stale listing)
+- Days on Market < 30: recent listing, lower urgency
+- Property Type: CONTEXT ONLY. Do not directly boost score.
+
+IMPORTANT — LLC/Trust Owners:
+- If Owner Status is "llc_or_trust_owner", do NOT increase motivation.
+- Mention it in the reason as informational.
 
 HALLUCINATION GUARD:
 - Use ONLY the facts provided above. Do not invent any information.
 - If data is insufficient, say "insufficient data" as the reason.
+- Keep reasoning SHORT — max 20 words per lead.
 
 Return ONLY a JSON array. No extra text. No markdown fences.
 Format:
@@ -111,24 +212,19 @@ JSON:"""
 # JSON PARSER (robust)
 # ============================================================
 def _parse_json_response(raw: str) -> List[Dict]:
-    """
-    Parse JSON from AI response. Handles markdown fences, extra text.
-    """
+    """Parse JSON from AI response. Handles markdown fences, extra text."""
     raw = raw.strip()
 
-    # Strip markdown fences
     if raw.startswith("```"):
         match = re.search(r"```(?:json)?\s*(.*?)```", raw, re.DOTALL)
         if match:
             raw = match.group(1).strip()
 
-    # Try direct parse
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
         pass
 
-    # Fallback: find first '[' and last ']'
     start = raw.find("[")
     end = raw.rfind("]")
     if start != -1 and end != -1 and end > start:
@@ -141,10 +237,53 @@ def _parse_json_response(raw: str) -> List[Dict]:
 
 
 # ============================================================
-# AI CALL (Gemini) — internal
+# ERROR CLASSIFIERS
+# ============================================================
+def _is_daily_quota_error(err_str: str) -> bool:
+    """Distinguish DAILY quota exhaustion from PER-MINUTE rate limit."""
+    lower = err_str.lower()
+
+    daily_markers = [
+        "perday", "per day", "per_day",
+        "daily limit", "daily_limit",
+        "requests_per_day",
+        "generaterequestsperday",
+        'quota_value": 1500',
+        'quota_value":1500',
+    ]
+    if any(m in lower for m in daily_markers):
+        return True
+
+    minute_markers = [
+        "perminute", "per minute", "per_minute",
+        "rate limit", "rate_limit",
+        "generaterequestsperminute",
+    ]
+    if any(m in lower for m in minute_markers):
+        return False
+
+    return False
+
+
+def _is_model_not_found_error(err_str: str) -> bool:
+    """Fix 3: detect model-not-found / invalid model errors."""
+    lower = err_str.lower()
+    markers = [
+        "404", "not found", "not_found",
+        "model not found", "invalid model",
+        "unsupported model", "does not exist",
+        "no longer available",
+    ]
+    return any(m in lower for m in markers)
+
+
+# ============================================================
+# AI CALL (Gemini)
 # ============================================================
 def _call_gemini(prompt: str) -> str:
     """Call Gemini API with prompt. Returns raw text response."""
+    global _LLM_CALL_COUNT
+
     from langchain_google_genai import ChatGoogleGenerativeAI
     import warnings
     warnings.filterwarnings("ignore")
@@ -153,55 +292,83 @@ def _call_gemini(prompt: str) -> str:
     if not api_key:
         raise ValueError("GEMINI_API_KEY not set in .env")
 
+    _log_model_once()
+
     llm = ChatGoogleGenerativeAI(
         model=MODEL_NAME,
         google_api_key=api_key,
     )
+
+    _LLM_CALL_COUNT += 1
 
     response = llm.invoke(prompt)
     return response.text
 
 
 # ============================================================
-# FALLBACK — rule-based (no AI)
+# FALLBACK — rule-based
 # ============================================================
 def _fallback_classify(lead: Dict[str, Any]) -> Dict:
-    """
-    Rule-based classification if AI completely fails.
-    Never crashes. Always returns something.
-    Considers distress signals (tax delinquent, pre-foreclosure, vacant).
-    """
+    """Rule-based classification if AI completely fails."""
     drop = lead.get("price_drop_pct", 0) or 0
     ltype = (lead.get("listing_type", "") or "").lower()
     owner = (lead.get("owner_status", "") or "").lower()
     distress = (lead.get("distress_signals", "") or "").lower()
 
-    # High priority distress signals
+    is_business_owner = "llc_or_trust_owner" in owner
+    owner_for_scoring = "unknown" if is_business_owner else owner
+
     high_distress = any(
         s in distress for s in ["tax_delinquent", "pre_foreclosure", "vacant"]
     )
-    # Medium priority distress
     medium_distress = any(
         s in distress for s in ["expired_listing", "divorce", "probate"]
     )
 
-    if (drop > 10 or (ltype == "fsbo" and drop > 5) 
-            or owner == "out_of_state_absentee" or high_distress):
+    dom = lead.get("days_on_market")
+    try:
+        dom = int(dom) if dom is not None else None
+    except (ValueError, TypeError):
+        dom = None
+
+    if (drop > 10 or (ltype == "fsbo" and drop > 5)
+            or owner_for_scoring == "out_of_state_absentee"
+            or high_distress
+            or (dom is not None and dom > 180)):
         label = "high_motivation"
-        parts = [f"{drop}% drop", ltype, owner]
+        parts = [f"{drop}% drop", ltype]
+        if owner_for_scoring != "unknown":
+            parts.append(owner_for_scoring)
+        if is_business_owner:
+            parts.append("(LLC/Trust — verify separately)")
         if high_distress:
             parts.append(f"distress: {distress}")
+        if dom is not None and dom > 180:
+            parts.append(f"DOM: {dom}")
         reason = f"Rule-based: {', '.join(p for p in parts if p)}"
-    elif (drop > 5 or ltype == "fsbo" 
-          or owner == "in_state_absentee" or medium_distress):
+
+    elif (drop > 5 or ltype == "fsbo"
+          or owner_for_scoring == "in_state_absentee"
+          or medium_distress
+          or (dom is not None and dom > 90)):
         label = "moderate_motivation"
-        parts = [f"{drop}% drop", ltype, owner]
+        parts = [f"{drop}% drop", ltype]
+        if owner_for_scoring != "unknown":
+            parts.append(owner_for_scoring)
+        if is_business_owner:
+            parts.append("(LLC/Trust — verify separately)")
         if medium_distress:
             parts.append(f"distress: {distress}")
+        if dom is not None and 90 < dom <= 180:
+            parts.append(f"DOM: {dom}")
         reason = f"Rule-based: {', '.join(p for p in parts if p)}"
+
     else:
         label = "low_motivation"
-        reason = "Rule-based: no signals"
+        if is_business_owner:
+            reason = "Rule-based: LLC/Trust owner, no signals"
+        else:
+            reason = "Rule-based: no signals"
 
     return {
         "lead_id": lead["lead_id"],
@@ -214,19 +381,11 @@ def _fallback_classify(lead: Dict[str, Any]) -> Dict:
 # PUBLIC: classify_batch()
 # ============================================================
 def classify_batch(leads: List[Dict[str, Any]]) -> List[Dict]:
-    """
-    Classify a list of leads using AI (with cache).
-    Handles batching, retries, fallback internally.
-
-    Args:
-        leads: List of dicts with keys: lead_id, listing_type, price_drop_pct,
-               county, owner_status
-
-    Returns:
-        List of dicts: {lead_id, signal_type, reason}
-    """
+    """Classify a list of leads using AI (with cache)."""
     if not leads:
         return []
+
+    _log_model_once()
 
     all_results = []
     total_batches = (len(leads) + BATCH_SIZE - 1) // BATCH_SIZE
@@ -244,12 +403,14 @@ def classify_batch(leads: List[Dict[str, Any]]) -> List[Dict]:
         try:
             batch_results = _classify_one_batch(batch, batch_num + 1)
             all_results.extend(batch_results)
+        except RuntimeError:
+            # Fix 3: model-not-found — already alerted, re-raise to stop
+            raise
         except Exception as e:
             log.error(f"Batch {batch_num + 1} failed completely: {e}")
             for lead in batch:
                 all_results.append(_fallback_classify(lead))
 
-        # Delay between batches (only if we might make an AI call)
         if batch_num < total_batches - 1:
             time.sleep(2)
 
@@ -257,13 +418,7 @@ def classify_batch(leads: List[Dict[str, Any]]) -> List[Dict]:
 
 
 def _classify_one_batch(batch: List[Dict], batch_num: int) -> List[Dict]:
-    """
-    Classify ONE batch. Checks cache first, then AI only for cache misses.
-    Saves new AI results back to cache. Retries with exponential backoff.
-    """
-    # ============================================================
-    # STEP 1: Check cache
-    # ============================================================
+    """Classify ONE batch with cache, retries, and pending markers."""
     cached_results, uncached_leads = get_many(batch)
 
     if not uncached_leads:
@@ -274,9 +429,6 @@ def _classify_one_batch(batch: List[Dict], batch_num: int) -> List[Dict]:
     log.info(f"Batch {batch_num}: {len(cached_results)} cached, "
              f"{len(uncached_leads)} need AI")
 
-    # ============================================================
-    # STEP 2: Call AI for uncached leads only
-    # ============================================================
     prompt = _build_batch_prompt(uncached_leads)
     ai_results = []
 
@@ -290,36 +442,66 @@ def _classify_one_batch(batch: List[Dict], batch_num: int) -> List[Dict]:
 
         except Exception as e:
             err_str = str(e)
-            is_rate_limit = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+
+            # Fix 3: model-not-found → alert + fail fast
+            if _is_model_not_found_error(err_str):
+                log.error(f"Batch {batch_num}: MODEL NOT FOUND — "
+                          f"model={MODEL_NAME}. Stopping pipeline.")
+                _alert_model_not_found(MODEL_NAME, err_str)
+                raise RuntimeError(
+                    f"Model not found: {MODEL_NAME}. "
+                    f"Update .env (LLM_MODEL or GEMINI_MODEL)."
+                )
+
+            is_429 = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str
+
+            if is_429 and _is_daily_quota_error(err_str):
+                log.warning(
+                    f"Batch {batch_num}: DAILY quota exhausted on attempt "
+                    f"{attempt}. Marking {len(uncached_leads)} leads as pending."
+                )
+                ai_results = [
+                    {
+                        "lead_id": lead["lead_id"],
+                        "signal_type": "pending",
+                        "reason": "Daily quota exhausted — retry next run",
+                    }
+                    for lead in uncached_leads
+                ]
+                break
+
             is_last = attempt == MAX_RETRIES
 
             if is_last:
                 log.error(f"Batch {batch_num}: AI failed after {MAX_RETRIES} "
-                          f"attempts, using fallback for {len(uncached_leads)} leads")
+                          f"attempts, using fallback for "
+                          f"{len(uncached_leads)} leads")
                 ai_results = [_fallback_classify(l) for l in uncached_leads]
                 break
 
             delay = BASE_DELAY_SEC * (2 ** (attempt - 1))
 
-            if is_rate_limit:
-                log.warning(f"Batch {batch_num}: Rate limit on attempt "
-                            f"{attempt}, waiting {delay}s")
+            if is_429:
+                log.warning(f"Batch {batch_num}: Per-minute rate limit on "
+                            f"attempt {attempt}, waiting {delay}s")
             else:
                 log.warning(f"Batch {batch_num}: Error on attempt "
                             f"{attempt}: {err_str[:80]}, waiting {delay}s")
 
             time.sleep(delay)
 
-    # ============================================================
-    # STEP 3: Save AI results to cache (only if they came from AI, not fallback)
-    # ============================================================
-    if ai_results:
-        saved = save_many(ai_results, uncached_leads)
-        log.info(f"Batch {batch_num}: cached {saved} new results")
+    # Save to cache (skip "pending")
+    pairs_to_cache = [
+        (r, l) for r, l in zip(ai_results, uncached_leads)
+        if r.get("signal_type") != "pending"
+    ]
+    if pairs_to_cache:
+        cache_results, cache_leads = zip(*pairs_to_cache)
+        saved = save_many(list(cache_results), list(cache_leads))
+        skipped = len(ai_results) - len(pairs_to_cache)
+        log.info(f"Batch {batch_num}: cached {saved} new results "
+                 f"(skipped {skipped} pending from cache)")
 
-    # ============================================================
-    # STEP 4: Combine cached + AI results
-    # ============================================================
     combined = cached_results + ai_results
     log.info(f"Batch {batch_num}: returning {len(combined)} total results "
              f"({len(cached_results)} cached, {len(ai_results)} from AI)")
@@ -328,9 +510,7 @@ def _classify_one_batch(batch: List[Dict], batch_num: int) -> List[Dict]:
 
 
 def _validate_results(parsed: List[Dict], batch: List[Dict]) -> List[Dict]:
-    """
-    Strict validation of AI output. Fills missing with fallback.
-    """
+    """Strict validation of AI output."""
     batch_ids = {lead["lead_id"] for lead in batch}
     results = {}
     fallbacks_used = 0
@@ -346,11 +526,10 @@ def _validate_results(parsed: List[Dict], batch: List[Dict]) -> List[Dict]:
         signal_type = item.get("signal_type", "").strip().lower()
         reason = item.get("reason", "").strip()
 
-        # Validate
         if lead_id not in batch_ids:
-            continue  # AI hallucinated an ID
+            continue
         if signal_type not in VALID_LABELS:
-            continue  # Invalid label
+            continue
         if not reason:
             reason = "AI provided no reason"
 
@@ -360,7 +539,6 @@ def _validate_results(parsed: List[Dict], batch: List[Dict]) -> List[Dict]:
             "reason": reason,
         }
 
-    # Fill missing leads with fallback
     final = []
     for lead in batch:
         if lead["lead_id"] in results:
@@ -370,47 +548,67 @@ def _validate_results(parsed: List[Dict], batch: List[Dict]) -> List[Dict]:
             final.append(_fallback_classify(lead))
 
     if fallbacks_used > 0:
-        log.warning(f"Used fallback for {fallbacks_used} leads "
-                    f"(AI missed or returned invalid)")
+        log.warning(f"Used fallback for {fallbacks_used} leads")
 
     return final
 
 
 # ============================================================
-# TEST — run this file directly
+# TEST
 # ============================================================
 if __name__ == "__main__":
     print("=" * 60)
-    print("LLM PROVIDER TEST (with Cache)")
+    print("LLM PROVIDER TEST v7 — Fix 3 (Admin Alert on 404)")
     print("=" * 60)
-
-    test_leads = [
-        {"lead_id": 0, "listing_type": "FSBO", "price_drop_pct": 15.0,
-         "county": "Dallas", "owner_status": "owner_occupied"},
-        {"lead_id": 1, "listing_type": "price_drop", "price_drop_pct": 8.0,
-         "county": "Harris", "owner_status": "in_state_absentee"},
-        {"lead_id": 2, "listing_type": "FSBO", "price_drop_pct": 0.0,
-         "county": "Travis", "owner_status": "out_of_state_absentee"},
-        {"lead_id": 3, "listing_type": "price_drop", "price_drop_pct": 3.0,
-         "county": "Collin", "owner_status": "owner_occupied"},
-        {"lead_id": 4, "listing_type": "FSBO", "price_drop_pct": 20.0,
-         "county": "Dallas", "owner_status": "out_of_state_absentee"},
-    ]
-
-    print(f"\nTesting with {len(test_leads)} leads...")
     print(f"Model: {MODEL_NAME}")
     print(f"Batch size: {BATCH_SIZE}")
-    print(f"\n--- RUN 1 (populates cache) ---")
+    print(f"Alerts available: {_ALERTS_AVAILABLE}")
 
-    results = classify_batch(test_leads)
+    # Quota classifier
+    print("\n[0] Quota classifier")
+    for m in [
+        "429 RESOURCE_EXHAUSTED: GenerateRequestsPerDayPerProjectPerModel",
+        "Quota exceeded, per day limit reached",
+    ]:
+        print(f"   {'OK ' if _is_daily_quota_error(m) else 'FAIL'} daily: {m[:60]}")
+    for m in [
+        "429 RESOURCE_EXHAUSTED: GenerateRequestsPerMinutePerProjectPerModel",
+        "Rate limit exceeded",
+    ]:
+        print(f"   {'OK ' if not _is_daily_quota_error(m) else 'FAIL'} minute: {m[:60]}")
 
-    print(f"\n✅ Got {len(results)} results:")
-    for r in results:
-        print(f"  Lead #{r['lead_id']}: {r['signal_type']}")
-        print(f"    Reason: {r['reason'][:80]}")
+    # Model-not-found classifier
+    print("\n[0b] Model-not-found classifier")
+    test_cases = [
+        "404 model not found",
+        "Invalid model name",
+        "Model does not exist",
+        "This model is no longer available to new users",  # Real Gemini message
+    ]
+    for m in test_cases:
+        ok = _is_model_not_found_error(m)
+        print(f"   {'OK ' if ok else 'FAIL'} not-found: {m[:60]}")
 
-    print(f"\n--- RUN 2 (should be 100% cache hit) ---")
-    results2 = classify_batch(test_leads)
+    # Rule-based tests
+    print("\n[1] LLC/Trust without signals (should be LOW):")
+    llc_lead = {
+        "lead_id": 0, "listing_type": "price_drop", "price_drop_pct": 0.0,
+        "county": "Dallas", "owner_status": "llc_or_trust_owner",
+        "distress_signals": "", "days_on_market": None, "property_type": "",
+    }
+    result = _fallback_classify(llc_lead)
+    print(f"   Result: {result['signal_type']} | {result['reason']}")
 
-    print(f"\n✅ Run 2 got {len(results2)} results")
-    print(f"   If you see '100% cache hit' above, cache is working!")
+    print("\n[2] High DOM (200 days) → HIGH:")
+    stale_lead = {
+        "lead_id": 1, "listing_type": "price_drop", "price_drop_pct": 3.0,
+        "county": "Dallas", "owner_status": "owner_occupied",
+        "distress_signals": "", "days_on_market": 200,
+        "property_type": "Single Family",
+    }
+    result = _fallback_classify(stale_lead)
+    print(f"   Result: {result['signal_type']} | {result['reason']}")
+
+    print("\n" + "=" * 60)
+    print("Test complete.")
+    print("=" * 60)
